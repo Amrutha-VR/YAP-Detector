@@ -77,6 +77,92 @@ async def docs():
     return HTMLResponse(UPLOAD_HTML)
 
 
+@app.get("/live", include_in_schema=False)
+async def live():
+    LIVE_HTML = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Live Stream</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 1rem; }
+    #controls { margin-bottom: 0.5rem; }
+    #transcript { margin-top: 0.5rem; white-space: pre-wrap; border: 1px solid #ddd; padding: 0.5rem; height: 150px; overflow:auto }
+    video { width: 100%; max-width: 640px; height: auto; background: #000 }
+  </style>
+</head>
+<body>
+  <h3>Live Video Stream</h3>
+  <div id="controls">
+    <button id="start">Start</button>
+    <button id="stop" disabled>Stop</button>
+  </div>
+  <video id="preview" autoplay muted playsinline></video>
+  <div id="transcript"></div>
+
+  <script>
+    let ws = null;
+    let mr = null;
+    let stream = null;
+    const startBtn = document.getElementById('start');
+    const stopBtn = document.getElementById('stop');
+    const preview = document.getElementById('preview');
+    const transcriptDiv = document.getElementById('transcript');
+
+    function appendText(t){
+      transcriptDiv.textContent = transcriptDiv.textContent + (transcriptDiv.textContent ? '\n' : '') + t;
+      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+    }
+
+    startBtn.onclick = async () => {
+      startBtn.disabled = true;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        preview.srcObject = stream;
+
+        ws = new WebSocket('ws://' + window.location.host + '/ws/video-stream');
+        ws.binaryType = 'arraybuffer';
+        ws.onmessage = (ev) => {
+          try {
+            const msg = JSON.parse(ev.data);
+            if (msg && msg.text) appendText(msg.text);
+          } catch(e) {}
+        };
+
+        const options = { mimeType: 'video/webm' };
+        mr = new MediaRecorder(stream, options);
+        mr.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
+            event.data.arrayBuffer().then(buf => ws.send(buf));
+          }
+        };
+        mr.start(1000);
+        stopBtn.disabled = false;
+      } catch (err) {
+        console.error(err);
+        startBtn.disabled = false;
+      }
+    };
+
+    stopBtn.onclick = () => {
+      stopBtn.disabled = true;
+      try {
+        if (mr && mr.state !== 'inactive') mr.stop();
+      } catch(e) {}
+      try { stream && stream.getTracks().forEach(t=>t.stop()); } catch(e) {}
+      try { if (ws) ws.close(); } catch(e) {}
+      preview.srcObject = null;
+      startBtn.disabled = false;
+    };
+  </script>
+</body>
+</html>
+"""
+    return HTMLResponse(LIVE_HTML)
+
+
 @app.post("/upload-video")
 async def upload_video(request: Request, video: UploadFile):
     tmp_path = None
