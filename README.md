@@ -4,6 +4,11 @@
 
 **Live transcription · AI-powered keyword detection · Security hardened · 100% local**
 
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Whisper](https://img.shields.io/badge/Whisper-base.en-FF6F00?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)
+
 *Built on three peer-reviewed speech processing research papers. Zero cloud dependency. No API keys.*
 
 </div>
@@ -24,64 +29,74 @@ Every design decision in this project traces back to a specific, documented prob
 - Fires visual + audio alerts with video-relative timestamps logged to SQLite
 - Runs entirely locally — no data ever leaves your machine
 
+---
+
+## Demo
+
+> *(Add GIF or screenshots here)*
+
+---
 
 ## System Architecture
 
+```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                          BROWSER  (Frontend)                         │
-│                                                                      │
+│                          BROWSER  (Frontend)                          │
+│                                                                        │
 │   ┌─────────────────────┐        ┌──────────────────────────────┐    │
-│   │   Upload Video Mode │        │     Live Stream Mode         │    |
-│   │   (raw binary POST) │        │   (YouTube URL → new tab)    │    │
+│   │   Upload Video Mode  │        │     Live Stream Mode          │    │
+│   │   (raw binary POST)  │        │   (YouTube URL → new tab)    │    │
 │   └──────────┬──────────┘        └───────────────┬──────────────┘    │
-│              │  HTTP                             │  WebSocket        │
-│   ┌──────────▼──────────────────────────────────▼──────────────┐     │
-│   │            Security Layer (Frontend)                       │     │
-│   │  XSS encoding · URL validation · Input length cap          |     │
-│   │  WS message schema whitelist · noopener/noreferrer         │     │
-│   └──────────┬───────────────────────────────────┬─────────────┘     │
-└──────────────┼───────────────────────────────────┼───────────────────┘
+│              │  HTTP                              │  WebSocket         │
+│   ┌──────────▼──────────────────────────────────▼──────────────┐    │
+│   │            Security Layer (Frontend)                         │    │
+│   │  XSS encoding · URL validation · Input length cap           │    │
+│   │  WS message schema whitelist · noopener/noreferrer          │    │
+│   └──────────┬───────────────────────────────────┬──────────────┘    │
+└──────────────┼───────────────────────────────────┼────────────────────┘
                │                                   │
 ┌──────────────▼───────────────────────────────────▼────────────────────┐
-│                         FASTAPI  SERVER  (Backend)                    │
-│                                                                       │
-│   ┌─────────────────┐         ┌──────────────────────────────────┐    │
-│   │  /upload-video  │         │  /yt-transcribe  (WebSocket)     │    │
-│   │  raw bytes →    │         │  yt-dlp resolves audio URL       │    │
-│   │  ffmpeg → WAV   │         │  ffmpeg pipes 16kHz mono PCM     │    │
-│   └────────┬────────┘         └─────────────────┬────────────────┘    │
-│            │                                     │                    │
-│   ┌────────▼─────────────────────────────────────▼────────────┐       │
-│   │           Security Layer (Backend)                        │       │
-│   │   SSRF prevention · URL allowlist · Private IP block      │       │
-│   └────────┬────────────────────────────────────┬─────────────┘       │
-│            │                                     │                    │
-│   ┌────────▼─────────────────────────────────────▼────────────┐       │
-│   │  [R3] Energy VAD — Sohn et al. (1999)                     │       │
-│   │  30ms frame RMS energy gate — silent chunks discarded     │       │
-│   └────────────────────────────┬──────────────────────────────┘       │
-│                                │                                      │
-│   ┌────────────────────────────▼───────────────────────────────┐      │
-│   │  faster-whisper  base.en · int8 · word_timestamps=True     │      │
-│   │  + Silero VAD filter (second silence gate)                 │      │
-│   └────────────────────────────┬───────────────────────────────┘      │
-│                                │                                      │
-│   ┌────────────────────────────▼───────────────────────────────┐      │
-│   │  [R2] W-CTC Word-level Confidence Gating                   │      │
-│   │  Kim et al. (Interspeech 2025)                             │      │
-│   │  Per-word probability + timestamp alignment check          │      │
-│   └────────────────────────────┬───────────────────────────────┘      │
-│                                │                                      │
-│   ┌────────────────────────────▼───────────────────────────────┐      │
-│   │  [R1] Local Agreement Policy with Rollback                 │      │
-│   │  Macháček et al. (Interspeech 2023)                        │      │
-│   │  Confirm words across consecutive chunks · rollback tail   │      │
-│   └────────────────────────────┬───────────────────────────────┘      │
-│                                │                                      │
-│        subtitle / alert ───────┴──► WebSocket ──► Browser             │
-│        SQLite ◄── alert log (keyword · timestamp · video_ts)          │
-└───────────────────────────────────────────────────────────────────────┘
+│                         FASTAPI  SERVER  (Backend)                      │
+│                                                                          │
+│   ┌─────────────────┐         ┌──────────────────────────────────┐     │
+│   │  /upload-video  │         │  /yt-transcribe  (WebSocket)      │     │
+│   │  raw bytes →    │         │  yt-dlp resolves audio URL        │     │
+│   │  ffmpeg → WAV   │         │  ffmpeg pipes 16kHz mono PCM      │     │
+│   └────────┬────────┘         └─────────────────┬────────────────┘     │
+│            │                                     │                       │
+│   ┌────────▼─────────────────────────────────────▼────────────┐        │
+│   │           Security Layer (Backend)                          │        │
+│   │   SSRF prevention · URL allowlist · Private IP block       │        │
+│   └────────┬────────────────────────────────────┬─────────────┘        │
+│            │                                     │                       │
+│   ┌────────▼─────────────────────────────────────▼────────────┐        │
+│   │  [R3] Energy VAD — Sohn et al. (1999)                      │        │
+│   │  30ms frame RMS energy gate — silent chunks discarded      │        │
+│   └────────────────────────────┬───────────────────────────────┘        │
+│                                │                                          │
+│   ┌────────────────────────────▼───────────────────────────────┐        │
+│   │  faster-whisper  base.en · int8 · word_timestamps=True     │        │
+│   │  + Silero VAD filter (second silence gate)                  │        │
+│   └────────────────────────────┬───────────────────────────────┘        │
+│                                │                                          │
+│   ┌────────────────────────────▼───────────────────────────────┐        │
+│   │  [R2] W-CTC Word-level Confidence Gating                   │        │
+│   │  Kim et al. (Interspeech 2025)                              │        │
+│   │  Per-word probability + timestamp alignment check           │        │
+│   └────────────────────────────┬───────────────────────────────┘        │
+│                                │                                          │
+│   ┌────────────────────────────▼───────────────────────────────┐        │
+│   │  [R1] Local Agreement Policy with Rollback                 │        │
+│   │  Macháček et al. (Interspeech 2023)                        │        │
+│   │  Confirm words across consecutive chunks · rollback tail   │        │
+│   └────────────────────────────┬───────────────────────────────┘        │
+│                                │                                          │
+│        subtitle / alert ───────┴──► WebSocket ──► Browser               │
+│        SQLite ◄── alert log (keyword · timestamp · video_ts)            │
+└──────────────────────────────────────────────────────────────────────────┘
+```
 
+---
 
 ## Research Implementation
 
@@ -332,15 +347,16 @@ async def global_exception_handler(request: Request, exc: Exception):
 ## Models
 
 ### faster-whisper `base.en`
-| Property     | Value                                                     |
-| Origin       | OpenAI Whisper, reimplemented by Systran with CTranslate2 |
-| Architecture | Encoder-Decoder Transformer                               |
-| Parameters   | ~74 million                                               |
-| Quantisation | int8 — 4× memory reduction vs float32                     |
-| Input        | 80-channel log-Mel spectrogram, 25ms frames, 10ms stride  |
-| Key feature  | `word_timestamps=True` — per-word start, end, probability |
-| License      | MIT — fully open source, no API key                       |
-| Runs         | 100% locally on CPU                                       |
+| Property | Value |
+|---|---|
+| Origin | OpenAI Whisper, reimplemented by Systran with CTranslate2 |
+| Architecture | Encoder-Decoder Transformer |
+| Parameters | ~74 million |
+| Quantisation | int8 — 4× memory reduction vs float32 |
+| Input | 80-channel log-Mel spectrogram, 25ms frames, 10ms stride |
+| Key feature | `word_timestamps=True` — per-word start, end, probability |
+| License | MIT — fully open source, no API key |
+| Runs | 100% locally on CPU |
 
 ### Silero VAD *(embedded)*
 A lightweight LSTM-based speech/non-speech classifier embedded inside faster-whisper. Activated via `vad_filter=True`. Acts as a second VAD gate after the energy-based pre-filter — catches subtle non-speech (background music, HVAC) that passes the energy gate.
@@ -351,25 +367,24 @@ Stream manifest resolver. Extracts the direct audio URL from YouTube without dow
 ---
 
 ## Tech Stack
-____________________________________________________________________________________________ 
-|                   |                               |                                       |
-| Layer             | Technology                    | Purpose                               |
-____________________________________________________________________________________________ 
-| Backend           | FastAPI + Uvicorn             | Async HTTP + WebSocket server         |
-| Transcription     | faster-whisper base.en        | Speech-to-text, local inference       |
-| Stream extraction | yt-dlp                        | YouTube manifest resolution           |
-| Audio pipeline    | FFmpeg                        | Decode/convert to 16kHz mono WAV      |
-| Fuzzy matching    | RapidFuzz `partial_ratio`     | Keyword detection with typo tolerance |
-| Alert storage     | SQLite                        | Persistent alert log                  |
-| Frontend          | Vanilla HTML/CSS/JS           | Zero framework dependencies           |
-| Video playback    | YouTube IFrame API            | Native video embedding                |
-| Real-time comms   | WebSocket                     | Sub-second subtitle delivery          |
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Backend | FastAPI + Uvicorn | Async HTTP + WebSocket server |
+| Transcription | faster-whisper base.en | Speech-to-text, local inference |
+| Stream extraction | yt-dlp | YouTube manifest resolution |
+| Audio pipeline | FFmpeg | Decode/convert to 16kHz mono WAV |
+| Fuzzy matching | RapidFuzz `partial_ratio` | Keyword detection with typo tolerance |
+| Alert storage | SQLite | Persistent alert log |
+| Frontend | Vanilla HTML/CSS/JS | Zero framework dependencies |
+| Video playback | YouTube IFrame API | Native video embedding |
+| Real-time comms | WebSocket | Sub-second subtitle delivery |
 
 ---
 
 ## Project Structure
 
-
+```
 securewatch/
 ├── backend/
 │   ├── main.py              # FastAPI server — all research + security logic
@@ -380,7 +395,7 @@ securewatch/
 │   ├── index.html           # Full UI — upload + live stream modes
 │   └── styles.css           # Dark intelligence monitoring theme
 └── README.md
-
+```
 
 ---
 
@@ -450,25 +465,25 @@ pydantic
 
 An alert fires only when **all five gates pass**:
 
-| Gate                     | Mechanism                              | Filters               |
-|---                       |---                                     |    ---                |
-| 1.   Fuzzy match         | RapidFuzz `partial_ratio > 0.80`       | Homophones, typos     |
-| 2. W-CTC word confidence | Per-word `probability >= 0.60`         | Low-certainty decodes |
-| 3. Timestamp alignment   | Word timestamps overlap segment window | Boundary drift        |
-| 4. Segment confidence    | `avg_logprob` → confidence `> 0.75`    | Low-quality segments  |
-| 5. Cooldown              | Same keyword cannot re-fire within 3s  | Alert spam            |
+| Gate | Mechanism | Filters |
+|---|---|---|
+| 1. Fuzzy match | RapidFuzz `partial_ratio > 0.80` | Homophones, typos |
+| 2. W-CTC word confidence | Per-word `probability >= 0.60` | Low-certainty decodes |
+| 3. Timestamp alignment | Word timestamps overlap segment window | Boundary drift |
+| 4. Segment confidence | `avg_logprob` → confidence `> 0.75` | Low-quality segments |
+| 5. Cooldown | Same keyword cannot re-fire within 3s | Alert spam |
 
 ---
 
 ## Latency
 
-| Component                     | Time               |
-|---                            |---                 |
-| Audio chunk size              | 5 seconds          |
-| Energy VAD (NumPy)            | < 1 ms             |
-| Whisper inference (CPU, int8) | 1 – 3 seconds      |
-| WebSocket delivery            | < 50 ms            |
-| **Total end-to-end**          | **~6 – 8 seconds** |
+| Component | Time |
+|---|---|
+| Audio chunk size | 5 seconds |
+| Energy VAD (NumPy) | < 1 ms |
+| Whisper inference (CPU, int8) | 1 – 3 seconds |
+| WebSocket delivery | < 50 ms |
+| **Total end-to-end** | **~6 – 8 seconds** |
 
 To reduce to ~3–4s: set `beam_size=1`, `best_of=1`. Accuracy decreases slightly.
 
