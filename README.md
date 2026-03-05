@@ -388,7 +388,7 @@ Stream manifest resolver. Extracts the direct audio URL from YouTube without dow
 ## Project Structure
 
 ```
-securewatch/
+YAP-Detector/
 ├── backend/
 │   ├── main.py              # FastAPI server — all research + security logic
 │   ├── alerts.db            # SQLite alert log (auto-created on first run)
@@ -413,7 +413,7 @@ securewatch/
 ```bash
 # Clone
 git clone https://github.com/YOUR_USERNAME/securewatch.git
-cd securewatch/backend
+cd YAP-Detector/backend
 
 # Virtual environment
 python -m venv venv
